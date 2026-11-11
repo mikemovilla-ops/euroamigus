@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { errorJson, requiereAdmin, requiereSesion } from "@/lib/sesion";
 import { ordenar, parsearCodigos, validarApuesta } from "@/lib/euromillones";
-import { aIso, semanaActiva } from "@/lib/fechas";
+import { aIso, hoyMadrid, semanaActiva, sorteosDeSemana, sumarDias } from "@/lib/fechas";
 import { getConfig } from "@/lib/turnos";
 import { sincronizarSorteos } from "@/lib/resultados";
 import { avisarBoletoSubido } from "@/lib/avisos";
@@ -23,6 +23,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     nota?: string | null;
     millonMartes?: string;
     millonViernes?: string;
+    fechaEchada?: string; // YYYY-MM-DD: el día que se compró el boleto
   };
   const jugada = await prisma.jugada.findUnique({ where: { id: params.id } });
   if (!jugada) return errorJson("Esa semana no existe.", 404);
@@ -37,6 +38,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const millonViernes = parsearCodigos(body.millonViernes ?? "");
   if (!millonMartes || !millonViernes) return errorJson("Código de El Millón incorrecto: son 3 letras y 5 números (p. ej. ABC12345).");
   if (millonMartes.length === 0 || millonViernes.length === 0) return errorJson("Falta el código de El Millón del martes y/o del viernes.");
+
+  // Día en que se echó (puede no ser el día en que se sube a la app). Entre
+  // el lunes anterior y el viernes de esa semana, y nunca en el futuro.
+  let echadaEn = jugada.echadaEn ?? new Date();
+  if (body.fechaEchada) {
+    const semana = aIso(jugada.semana);
+    const [, viernes] = sorteosDeSemana(semana);
+    const max = viernes < hoyMadrid() ? viernes : hoyMadrid();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.fechaEchada) || body.fechaEchada < sumarDias(semana, -7) || body.fechaEchada > max) {
+      return errorJson("La fecha en que lo echaste no encaja con esta semana.");
+    }
+    // A mediodía, para que el día no cambie por la zona horaria.
+    echadaEn = new Date(`${body.fechaEchada}T12:00:00Z`);
+  }
 
   const config = await getConfig();
   const variable = ordenar(body.apuesta);
@@ -54,7 +69,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       where: { id: jugada.id },
       data: {
         echada: true,
-        echadaEn: jugada.echadaEn ?? new Date(),
+        echadaEn,
         echadaPorId: jugada.echadaPorId ?? miembroId,
         fotoUrl: body.fotoUrl ?? jugada.fotoUrl,
         nota: body.nota?.trim() || null,

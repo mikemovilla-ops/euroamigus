@@ -22,7 +22,9 @@ export default function AdminSorteos({ pendientes }: { pendientes: string[] }) {
     setSync("Buscando…");
     const res = await fetch("/api/admin/sorteos", { method: "POST" });
     const r = await res.json();
-    setSync(r.error ? `Error: ${r.error}` : `${r.guardados} guardados · ${r.pendientes} pendientes`);
+    const partes = [`${r.guardados} guardados`, `${r.pendientes} pendientes`];
+    if (r.aproximados) partes.push(`${r.aproximados} con importe aproximado (FDJ)`);
+    setSync(`${partes.join(" · ")}${r.error ? ` · Error: ${r.error}` : ""}`);
     router.refresh();
   }
 
@@ -35,7 +37,13 @@ export default function AdminSorteos({ pendientes }: { pendientes: string[] }) {
     if (s) {
       setComb({ numeros: s.numeros, estrellas: s.estrellas });
       setPremios(Object.fromEntries(s.premios.map((p) => [`${p.n}-${p.e}`, String(p.premioCent / 100)])));
-      setFuente(s.fuente === "api" ? "Guardado desde la API" : "Metido a mano");
+      setFuente(
+        s.fuente === "api"
+          ? "Guardado desde la API (importes exactos)"
+          : s.fuente === "fdj"
+            ? "Guardado desde la FDJ francesa: importes redondeados a 0,10 €, se corregirán solos cuando responda la API principal"
+            : "Metido a mano"
+      );
     } else {
       setComb({ numeros: [], estrellas: [] });
       setPremios({});

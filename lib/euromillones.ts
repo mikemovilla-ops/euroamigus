@@ -4,7 +4,8 @@
 
 export type Combinacion = { numeros: number[]; estrellas: number[] };
 export type PremioCategoria = { n: number; e: number; premioCent: number; ganadores: number };
-export type SorteoDatos = Combinacion & { fecha: string; premios: PremioCategoria[] };
+// `aproximado`: importes de la FDJ, redondeados a 0,10 € (ver lib/fdj.ts).
+export type SorteoDatos = Combinacion & { fecha: string; premios: PremioCategoria[]; aproximado?: boolean };
 
 export const PRECIO_APUESTA_CENT = 250;
 

@@ -22,6 +22,15 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.1.0",
+    fecha: "2026-11-11",
+    cambios: [
+      "Los resultados ya no dependen de una sola fuente: si la principal no responde, se cogen del histórico oficial de la lotería francesa (FDJ). En ese caso el premio sale con \"≈\" (redondeado a 10 céntimos) y se ajusta solo al céntimo en cuanto la principal vuelve a responder.",
+      "Al subir el boleto se puede indicar qué día se echó, por si se sube a la app otro día.",
+      "Botón \"Corregir boleto\" también en la tarjeta de \"Esta semana\" de la portada.",
+    ],
+  },
+  {
     version: "1.0.1",
     fecha: "2026-11-11",
     cambios: [

@@ -128,6 +128,22 @@ export default async function Inicio({ searchParams }: { searchParams: { error?:
                 </div>
               </div>
               <ResultadosJugada jugada={actual} />
+              {(isAdmin || (!!miembroId && (actual.responsable.id === miembroId || actual.echadaPor?.id === miembroId))) && (
+                <RegistrarJugada
+                  jugadaId={actual.id}
+                  semana={actual.semana}
+                  fija={fija}
+                  variante="sec"
+                  textoBoton="✏️ Corregir boleto"
+                  inicial={{
+                    apuesta: actual.apuestas.find((a) => !a.fija) ?? null,
+                    fotoUrl: actual.fotoUrl,
+                    nota: actual.nota,
+                    millon: actual.millon,
+                    fechaEchada: actual.echadaEn?.slice(0, 10) ?? null,
+                  }}
+                />
+              )}
             </div>
           )}
         </section>

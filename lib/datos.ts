@@ -57,7 +57,13 @@ export async function cargarJugadas(): Promise<{ jugadas: JugadaVista[]; totales
   const sorteos = new Map<string, SorteoDatos>(
     sorteosDb.map((s) => [
       aIso(s.fecha),
-      { fecha: aIso(s.fecha), numeros: s.numeros, estrellas: s.estrellas, premios: s.premios as PremioCategoria[] },
+      {
+        fecha: aIso(s.fecha),
+        numeros: s.numeros,
+        estrellas: s.estrellas,
+        premios: s.premios as PremioCategoria[],
+        aproximado: s.fuente === "fdj",
+      },
     ])
   );
 

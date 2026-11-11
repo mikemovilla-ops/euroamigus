@@ -57,13 +57,19 @@ export default function ResultadosJugada({ jugada }: { jugada: JugadaVista }) {
                       </b>
                     </span>
                     {r.premioCent > 0 ? (
-                      <span className="font-bold text-acierto">{euros(r.premioCent)}</span>
+                      <span className="font-bold text-acierto" title={sorteo.aproximado ? "Importe aproximado" : undefined}>
+                        {sorteo.aproximado && "≈ "}
+                        {euros(r.premioCent)}
+                      </span>
                     ) : (
                       <span className="text-tinta/40">Nada</span>
                     )}
                   </li>
                 ))}
               </ul>
+              {sorteo.aproximado && apuestas?.some((r) => r.premioCent > 0) && (
+                <p className="mt-2 text-[11px] text-tinta/50">≈ Importe provisional (redondeado); se ajusta solo al céntimo en cuanto esté el oficial.</p>
+              )}
             </>
           )}
           <Millon fecha={fecha} millon={millon} />

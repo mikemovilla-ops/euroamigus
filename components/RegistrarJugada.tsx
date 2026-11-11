@@ -7,7 +7,7 @@ import { upload } from "@vercel/blob/client";
 import SelectorApuesta from "@/components/SelectorApuesta";
 import { Combinacion } from "@/components/Bolas";
 import { parsearCodigos } from "@/lib/euromillones";
-import { formatearSemana } from "@/lib/fechas";
+import { formatearSemana, hoyMadrid, sorteosDeSemana, sumarDias } from "@/lib/fechas";
 
 type Apuesta = { numeros: number[]; estrellas: number[] };
 
@@ -15,7 +15,13 @@ type Props = {
   jugadaId: string;
   semana: string;
   fija: Apuesta;
-  inicial?: { apuesta: Apuesta | null; fotoUrl: string | null; nota: string | null; millon: [string[], string[]] };
+  inicial?: {
+    apuesta: Apuesta | null;
+    fotoUrl: string | null;
+    nota: string | null;
+    millon: [string[], string[]];
+    fechaEchada?: string | null; // YYYY-MM-DD
+  };
   textoBoton?: string;
   variante?: "oro" | "sec";
 };
@@ -56,6 +62,13 @@ export default function RegistrarJugada({
   const [nota, setNota] = useState(inicial?.nota ?? "");
   const [millonMartes, setMillonMartes] = useState(inicial?.millon[0].join(", ") ?? "");
   const [millonViernes, setMillonViernes] = useState(inicial?.millon[1].join(", ") ?? "");
+  // Día en que se echó: por defecto hoy, pero si se sube a la app otro día
+  // (p. ej. al día siguiente) se puede cambiar. Entre el lunes de la semana
+  // anterior y el viernes de esta, sin pasar de hoy (lo mismo que valida la API).
+  const hoy = hoyMadrid();
+  const fechaMin = sumarDias(semana, -7);
+  const fechaMax = sorteosDeSemana(semana)[1] < hoy ? sorteosDeSemana(semana)[1] : hoy;
+  const [fechaEchada, setFechaEchada] = useState(inicial?.fechaEchada ?? fechaMax);
   const [estado, setEstado] = useState<"" | "subiendo" | "guardando">("");
   const [error, setError] = useState("");
 
@@ -99,7 +112,7 @@ export default function RegistrarJugada({
       const res = await fetch(`/api/jugadas/${jugadaId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apuesta, fotoUrl, nota, millonMartes, millonViernes }),
+        body: JSON.stringify({ apuesta, fotoUrl, nota, millonMartes, millonViernes, fechaEchada }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se ha podido guardar.");
       setAbierto(false);
@@ -240,6 +253,20 @@ export default function RegistrarJugada({
               </label>
             ))}
           </div>
+        </section>
+
+        <section className="mb-6">
+          <label className="etiqueta mb-1 block" htmlFor="fechaEchada">5 · ¿Qué día lo echaste?</label>
+          <p className="mb-2 text-xs text-tinta/50">Si lo subes otro día, pon aquí el día en que compraste el boleto.</p>
+          <input
+            id="fechaEchada"
+            type="date"
+            className="input max-w-[12rem]"
+            value={fechaEchada}
+            min={fechaMin}
+            max={fechaMax}
+            onChange={(e) => setFechaEchada(e.target.value)}
+          />
         </section>
 
         <section>

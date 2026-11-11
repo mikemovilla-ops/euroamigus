@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/avisos", () => ({ avisarPremioSorteo: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ ADMIN_EMAILS: [] }));
 
 import { convertirSorteoApi } from "./resultados";
 import { comprobarApuesta } from "./euromillones";

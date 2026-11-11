@@ -76,7 +76,7 @@ export default function TarjetaJugada({ jugada, fija, puedeEditar }: Props) {
             textoBoton={jugada.echada ? "Corregir" : "Registrar tarde"}
             inicial={
               jugada.echada
-                ? { apuesta: variable ? { numeros: variable.numeros, estrellas: variable.estrellas } : null, fotoUrl: jugada.fotoUrl, nota: jugada.nota, millon: jugada.millon }
+                ? { apuesta: variable ? { numeros: variable.numeros, estrellas: variable.estrellas } : null, fotoUrl: jugada.fotoUrl, nota: jugada.nota, millon: jugada.millon, fechaEchada: jugada.echadaEn?.slice(0, 10) ?? null }
                 : undefined
             }
           />
