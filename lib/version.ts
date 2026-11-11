@@ -22,6 +22,11 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.2.1",
+    fecha: "2026-11-11",
+    cambios: ["En el móvil, Ajustes tiene su propia pestaña en la barra de abajo (antes estaba dentro de \"Tú\")."],
+  },
+  {
     version: "1.2.0",
     fecha: "2026-11-11",
     cambios: [

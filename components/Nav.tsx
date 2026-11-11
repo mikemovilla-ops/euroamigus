@@ -54,6 +54,17 @@ function IconoAdmin({ activo }: PropsIcono) {
   );
 }
 
+function IconoAjustes({ activo }: PropsIcono) {
+  // Engranaje (Admin usa los deslizadores, para no confundirlos)
+  return (
+    <svg {...svg(activo)}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6" />
+      <circle cx="12" cy="12" r="6.5" />
+    </svg>
+  );
+}
+
 function IconoPerfil({ activo }: PropsIcono) {
   return (
     <svg {...svg(activo)}>
@@ -92,6 +103,7 @@ export default function Nav() {
   const pestanas = [
     { href: "/", texto: "Turnos", Icono: IconoTurnos },
     { href: "/historico", texto: "Histórico", Icono: IconoHistorico },
+    { href: "/ajustes", texto: "Ajustes", Icono: IconoAjustes },
     ...(session.user.isAdmin ? [{ href: "/admin", texto: "Admin", Icono: IconoAdmin }] : []),
   ];
   const activo = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -128,7 +140,7 @@ export default function Nav() {
 
           {/* Escritorio */}
           <nav className="hidden items-center gap-1 sm:flex">
-            {[...pestanas, { href: "/ajustes", texto: "Ajustes" }].map((p) => (
+            {pestanas.map((p) => (
               <Link key={p.href} href={p.href} onClick={(e) => navegar(e, p.href)} className={enlaceEscritorio(p.href)}>
                 {p.texto}
               </Link>
@@ -168,9 +180,6 @@ export default function Nav() {
         {menuAbierto && (
           <div className="flex flex-col gap-3 border-b border-tinta/10 px-4 py-3 text-sm">
             <p className="truncate text-xs text-tinta/40">{session.user.email}</p>
-            <Link href="/ajustes" onClick={(e) => navegar(e, "/ajustes")} className="text-tinta/80 transition hover:text-tinta">
-              Ajustes
-            </Link>
             <Link href="/novedades" onClick={(e) => navegar(e, "/novedades")} className="text-tinta/80 transition hover:text-tinta">
               Novedades
             </Link>
@@ -200,7 +209,7 @@ export default function Nav() {
           <button
             onClick={() => setMenuAbierto((v) => !v)}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition ${
-              menuAbierto || activo("/ajustes") ? "text-oro" : "text-tinta/50"
+              menuAbierto ? "text-oro" : "text-tinta/50"
             }`}
           >
             {session.user.image ? (
