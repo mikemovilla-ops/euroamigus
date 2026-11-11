@@ -22,6 +22,14 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.2.0",
+    fecha: "2026-11-11",
+    cambios: [
+      "Admin: nuevo apartado \"Ejecución automática\" que muestra cuándo se ejecutó por última vez la tarea diaria (avisos y resultados) y qué hizo, con aviso en rojo si lleva más de un día sin ejecutarse o falló.",
+      "Admin: las secciones se pliegan y despliegan; Miembros y Movimientos del bote empiezan plegadas.",
+    ],
+  },
+  {
     version: "1.1.0",
     fecha: "2026-11-11",
     cambios: [

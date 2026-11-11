@@ -9,6 +9,7 @@ import AdminConfig from "@/components/admin/AdminConfig";
 import AdminMovimientos from "@/components/admin/AdminMovimientos";
 import AdminSorteos from "@/components/admin/AdminSorteos";
 import AdminMillon from "@/components/admin/AdminMillon";
+import EstadoCron from "@/components/admin/EstadoCron";
 
 export const dynamic = "force-dynamic";
 
@@ -57,18 +58,53 @@ export default async function Admin() {
   const pendientes = fechas.filter((f) => !guardados.has(f)).sort();
   const primero = miembros.find((m) => m.activo)?.nombre ?? null;
 
-  const Seccion = ({ titulo, id, children }: { titulo: string; id?: string; children: React.ReactNode }) => (
-    <section id={id} className="card scroll-mt-20 p-4 sm:p-5">
-      <h2 className="mb-4 text-lg font-bold">{titulo}</h2>
-      {children}
-    </section>
+  // Registro del cron. Si la tabla aún no existe en esta base de datos (falta
+  // el db:push), que no se caiga la página de Admin entera.
+  let ejecuciones: { id: string; fecha: Date; ok: boolean; resumen: string }[] | null;
+  try {
+    ejecuciones = await prisma.ejecucionCron.findMany({ orderBy: { fecha: "desc" }, take: 10 });
+  } catch {
+    ejecuciones = null;
+  }
+
+  // Secciones desplegables: las de uso diario abiertas, Miembros y
+  // Movimientos plegadas (se tocan poco y ocupan mucho).
+  const Seccion = ({
+    titulo,
+    resumen,
+    id,
+    plegada = false,
+    children,
+  }: {
+    titulo: string;
+    resumen?: string;
+    id?: string;
+    plegada?: boolean;
+    children: React.ReactNode;
+  }) => (
+    <details id={id} open={!plegada} className="card group scroll-mt-20">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 sm:p-5 [&::-webkit-details-marker]:hidden">
+        <span>
+          <span className="text-lg font-bold">{titulo}</span>
+          {resumen && <span className="ml-2 text-sm text-tinta/50">{resumen}</span>}
+        </span>
+        <span className="text-tinta/50 transition group-open:rotate-180" aria-hidden>
+          ▾
+        </span>
+      </summary>
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">{children}</div>
+    </details>
   );
 
   return (
-    <div className="space-y-6">
-      <h1 className="font-display text-3xl font-extrabold">Admin</h1>
+    <div className="space-y-4">
+      <h1 className="mb-2 font-display text-3xl font-extrabold">Admin</h1>
 
-      <Seccion titulo="Miembros y orden de turnos">
+      <Seccion titulo="Ejecución automática">
+        <EstadoCron ejecuciones={ejecuciones} />
+      </Seccion>
+
+      <Seccion titulo="Miembros y orden de turnos" resumen={`${miembros.filter((m) => m.activo).length} activos`} plegada>
         <AdminMiembros
           iniciales={miembros.map((m) => ({ id: m.id, nombre: m.nombre, email: m.email, emailAvisos: m.emailAvisos, activo: m.activo }))}
         />
@@ -83,7 +119,7 @@ export default async function Admin() {
         />
       </Seccion>
 
-      <Seccion titulo="Bote del grupo: movimientos">
+      <Seccion titulo="Bote del grupo: movimientos" resumen={`${movimientos.length}`} plegada>
         <AdminMovimientos
           hoy={hoyMadrid()}
           miembros={miembros.map((m) => ({ id: m.id, nombre: m.nombre }))}

@@ -7,38 +7,49 @@ import { getConfig } from "@/lib/turnos";
 const combinacionTexto = (numeros: number[], estrellas: number[]) => `${numeros.join(" · ")}  ★ ${estrellas.join(" · ")}`;
 
 // Lunes: "te toca esta semana" al responsable (una sola vez por semana).
-export async function avisarTurno() {
+// Devuelve qué ha pasado, para el registro del cron (ver Admin).
+export async function avisarTurno(): Promise<string> {
   const jugada = await prisma.jugada.findUnique({
     where: { semana: aDate(semanaActiva()) },
     include: { responsable: true },
   });
-  if (!jugada || jugada.echada || jugada.avisoTurnoEn) return;
+  if (!jugada) return "Aviso «te toca»: no hay turno esta semana";
+  if (jugada.echada) return "Aviso «te toca»: no hace falta, el boleto ya está subido";
+  if (jugada.avisoTurnoEn) return `Aviso «te toca»: ya se había enviado a ${jugada.responsable.nombre}`;
   const config = await getConfig();
   const fija = combinacionTexto(config.numerosFijos, config.estrellasFijas);
   const semana = formatearSemana(aIso(jugada.semana));
-  await enviar(
+  const enviado = await enviar(
     await destinatarios({ miembroIds: [jugada.responsableId], conAdmins: true }),
     "🎟️ Esta semana te toca echar el Euromillones",
     `Hola ${jugada.responsable.nombre}: esta semana (${semana}) te toca echar el Euromillones.\n2 apuestas para martes y viernes (10 €). La fija: ${fija}.\nCuando lo eches, sube la foto y los números en la app.`,
     `<p>Hola <b>${escapeHtml(jugada.responsable.nombre)}</b>:</p><p>Esta semana (<b>${semana}</b>) te toca echar el Euromillones: 2 apuestas para martes y viernes (10 €).</p><p>La fija: <b>${fija}</b></p><p>Cuando lo eches, sube la foto y los números en la app.</p>`
   );
   await prisma.jugada.update({ where: { id: jugada.id }, data: { avisoTurnoEn: new Date() } });
+  return enviado
+    ? `Aviso «te toca» enviado a ${jugada.responsable.nombre} (y copia al admin)`
+    : `Aviso «te toca» para ${jugada.responsable.nombre} NO enviado (sin email o fallo de Gmail)`;
 }
 
 // Martes: si aún nadie ha subido el boleto, recordatorio al responsable.
-export async function avisarRecordatorio() {
+export async function avisarRecordatorio(): Promise<string> {
   const jugada = await prisma.jugada.findUnique({
     where: { semana: aDate(semanaActiva()) },
     include: { responsable: true },
   });
-  if (!jugada || jugada.echada || jugada.avisoRecordatorioEn) return;
-  await enviar(
+  if (!jugada) return "Recordatorio: no hay turno esta semana";
+  if (jugada.echada) return "Recordatorio: no hace falta, el boleto ya está subido";
+  if (jugada.avisoRecordatorioEn) return `Recordatorio: ya se había enviado a ${jugada.responsable.nombre}`;
+  const enviado = await enviar(
     await destinatarios({ miembroIds: [jugada.responsableId], conAdmins: true }),
     "⏰ Hoy hay sorteo y el boleto aún no está subido",
     `Hola ${jugada.responsable.nombre}: hoy es el sorteo del martes y todavía no hay boleto registrado esta semana. Si ya lo has echado, súbelo a la app; si no puedes, avisa al grupo para que lo eche otro.`,
     `<p>Hola <b>${escapeHtml(jugada.responsable.nombre)}</b>:</p><p>Hoy es el sorteo del martes y todavía <b>no hay boleto registrado</b> esta semana.</p><p>Si ya lo has echado, súbelo a la app. Si no puedes, avisa al grupo para que lo eche otro.</p>`
   );
   await prisma.jugada.update({ where: { id: jugada.id }, data: { avisoRecordatorioEn: new Date() } });
+  return enviado
+    ? `Recordatorio «sin subir» enviado a ${jugada.responsable.nombre} (y copia al admin)`
+    : `Recordatorio para ${jugada.responsable.nombre} NO enviado (sin email o fallo de Gmail)`;
 }
 
 // Al registrar el boleto por primera vez: aviso a todo el grupo (menos a

@@ -61,8 +61,9 @@ export async function destinatarios(
   return dirs.length > 0 || admins.length > 0 ? ADMIN_EMAILS : [];
 }
 
-export async function enviar(para: string[], asunto: string, texto: string, html: string) {
-  if (!transporter || para.length === 0) return;
+// Devuelve true si Gmail ha aceptado el correo.
+export async function enviar(para: string[], asunto: string, texto: string, html: string): Promise<boolean> {
+  if (!transporter || para.length === 0) return false;
   try {
     await transporter.sendMail({
       from: `"EuroAmigus" <${process.env.GMAIL_USER}>`,
@@ -71,7 +72,9 @@ export async function enviar(para: string[], asunto: string, texto: string, html
       text: `${texto}\n\n${URL_APP}`,
       html: `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5;color:#0B1437">${html}<p style="margin-top:24px"><a href="${URL_APP}" style="background:#F5C542;color:#070D26;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600">Abrir EuroAmigus</a></p><p style="font-size:12px;color:#888">Puedes cambiar el email o dejar de recibir avisos en ${URL_APP}/ajustes</p></div>`,
     });
+    return true;
   } catch (e) {
     console.error(`No se pudo enviar el aviso "${asunto}":`, e);
+    return false;
   }
 }
