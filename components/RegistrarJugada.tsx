@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 import SelectorApuesta from "@/components/SelectorApuesta";
@@ -57,6 +58,17 @@ export default function RegistrarJugada({
   const [millonViernes, setMillonViernes] = useState(inicial?.millon[1].join(", ") ?? "");
   const [estado, setEstado] = useState<"" | "subiendo" | "guardando">("");
   const [error, setError] = useState("");
+
+  // Con el pop-up abierto, que no se desplace la página de detrás (en móvil
+  // se arrastraba el fondo al hacer scroll dentro del formulario).
+  useEffect(() => {
+    if (!abierto) return;
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = antes;
+    };
+  }, [abierto]);
 
   const millonOk = (t: string) => {
     const c = parsearCodigos(t);
@@ -134,8 +146,12 @@ export default function RegistrarJugada({
     </label>
   );
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/75 sm:items-center sm:p-4" onClick={() => !estado && setAbierto(false)}>
+  // Se pinta en <body> con un portal: si se quedara dentro de la tarjeta de
+  // la portada (que lleva backdrop-blur + overflow-hidden), el `fixed` se
+  // posicionaría respecto a la tarjeta y el pop-up saldría recortado dentro
+  // de ella en vez de ocupar la pantalla.
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 sm:items-center sm:p-4" onClick={() => !estado && setAbierto(false)}>
       <div
         className="flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-tinta/15 bg-noche shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
@@ -242,6 +258,7 @@ export default function RegistrarJugada({
           {faltan.length > 0 && <p className="mt-2 text-center text-xs text-tinta/60">Falta: {faltan.join(" · ")}</p>}
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -22,6 +22,13 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.0.1",
+    fecha: "2026-11-11",
+    cambios: [
+      "Arreglado el formulario para subir el boleto: salía recortado dentro de la tarjeta de \"Esta semana\" y no se veían la foto ni los números. Ahora se abre como ventana a pantalla completa.",
+    ],
+  },
+  {
     version: "1.0.0",
     fecha: "2026-11-11",
     hito: true,
