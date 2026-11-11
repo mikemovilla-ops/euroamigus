@@ -1,0 +1,191 @@
+// Esquema de EuroAmigus: 10 amigos que juegan al Euromillones por turnos.
+// Cada semana a uno le toca echar el boleto (2 apuestas para martes y
+// viernes, 10 €). Modelos de NextAuth + modelos propios.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------- NextAuth ----------
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- EuroAmigus ----------
+
+// Los del grupo. Se dan de alta desde /admin con nombre y email de Google:
+// solo pueden entrar en la app los emails que estén aquí (o los admins).
+// `orden` es su posición en la rotación de turnos. Un miembro inactivo no
+// entra en la rotación pero conserva su histórico.
+model Miembro {
+  id      String  @id @default(cuid())
+  nombre  String
+  email   String? @unique
+  orden   Int
+  activo  Boolean @default(true)
+  // Email donde recibir los avisos si no quiere usar el de Google (el de
+  // `email`, que es solo para entrar). Lo cambia cada uno en /ajustes.
+  emailAvisos   String?
+  recibirAvisos Boolean @default(true)
+
+  turnos  Jugada[] @relation("Responsable")
+  echadas Jugada[] @relation("EchadaPor")
+  movimientos         Movimiento[] @relation("MovOrigen")
+  movimientosRecibidos Movimiento[] @relation("MovDestino")
+  premiosHistoricos   PremioHistorico[]
+}
+
+// Premios de antes de usar la app (importados de la hoja que llevabais).
+// No tienen números ni semana asociada: solo fecha, quién lo cobró (y lo
+// tiene) e importe. Cuentan para premios, bote y "quién tiene el dinero".
+model PremioHistorico {
+  id          String    @id @default(cuid())
+  fecha       DateTime? @db.Date // alguno no tiene fecha
+  miembroId   String
+  miembro     Miembro   @relation(fields: [miembroId], references: [id])
+  importeCent Int
+  nota        String?
+}
+
+// Una semana de juego (identificada por su lunes). Se crean por adelantado
+// según la rotación para poder ver e intercambiar los próximos turnos.
+// `echada` pasa a true cuando alguien registra el boleto con foto y números.
+model Jugada {
+  id            String    @id @default(cuid())
+  semana        DateTime  @unique @db.Date
+  responsableId String
+  responsable   Miembro   @relation("Responsable", fields: [responsableId], references: [id])
+  echada        Boolean   @default(false)
+  echadaEn      DateTime?
+  echadaPorId   String?
+  echadaPor     Miembro?  @relation("EchadaPor", fields: [echadaPorId], references: [id])
+  fotoUrl       String?
+  nota          String?
+  importeCent   Int       @default(1000)
+  apuestas      Apuesta[]
+  // Códigos de El Millón que vienen en el boleto, por sorteo (normalmente
+  // uno, pero se admiten varios).
+  millonMartes  String[]  @default([])
+  millonViernes String[]  @default([])
+  // Para no repetir los avisos por email de esta semana.
+  avisoTurnoEn        DateTime?
+  avisoRecordatorioEn DateTime?
+}
+
+// Código(s) ganador(es) de El Millón de un sorteo. No vienen en la API de
+// resultados: los mete el admin a mano.
+model Millon {
+  fecha   DateTime @id @db.Date
+  codigos String[]
+}
+
+model Apuesta {
+  id        String @id @default(cuid())
+  jugadaId  String
+  jugada    Jugada @relation(fields: [jugadaId], references: [id], onDelete: Cascade)
+  numeros   Int[]
+  estrellas Int[]
+  fija      Boolean @default(false)
+}
+
+// Resultado oficial de un sorteo (martes o viernes). Se descarga solo de la
+// API pública; el admin puede meterlo o corregirlo a mano si falla.
+// `premios` es [{ n, e, premioCent, ganadores }] — n números + e estrellas.
+model Sorteo {
+  id            String   @id @default(cuid())
+  fecha         DateTime @unique @db.Date
+  numeros       Int[]
+  estrellas     Int[]
+  premios       Json
+  fuente        String   @default("api")
+  actualizadoEn DateTime @updatedAt
+}
+
+enum TipoMovimiento {
+  INGRESO   // `miembro` tiene dinero del grupo: saldo inicial, premio cobrado fuera de la app...
+  RETIRADA  // `miembro` reparte dinero del bote entre el grupo
+  GASTO     // `miembro` paga algo con el bote (p. ej. una semana de juego)
+  TRASPASO  // `miembro` le pasa dinero del bote a `destino` (el bote total no cambia)
+}
+
+// Movimientos manuales del bote del grupo. Los premios de las jugadas
+// registradas en la app se suman solos (a quien echó el boleto); esto es
+// para todo lo demás. El bote no está en una hucha común: cada movimiento
+// dice quién tiene el dinero.
+model Movimiento {
+  id          String         @id @default(cuid())
+  fecha       DateTime       @db.Date
+  tipo        TipoMovimiento
+  importeCent Int
+  concepto    String
+  miembroId   String
+  miembro     Miembro        @relation("MovOrigen", fields: [miembroId], references: [id])
+  destinoId   String?
+  destino     Miembro?       @relation("MovDestino", fields: [destinoId], references: [id])
+  creadoEn    DateTime       @default(now())
+}
+
+// Fila única (id = 1) con la configuración del grupo.
+model Config {
+  id                 Int       @id @default(1)
+  // Lunes de la semana en que le toca al primero de la lista de miembros.
+  inicioRotacion     DateTime? @db.Date
+  numerosFijos       Int[]     @default([13, 17, 23, 28, 41])
+  estrellasFijas     Int[]     @default([2, 12])
+  importeSemanalCent Int       @default(1000)
+  // Lo jugado antes de usar la app (semanas × importe), para el balance.
+  semanasHistoricas  Int       @default(0)
+  gastoHistoricoCent Int       @default(0)
+  historicoDesde     DateTime? @db.Date
+  // Para no machacar la API de resultados en cada visita.
+  ultimaSync         DateTime?
+}
