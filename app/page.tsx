@@ -12,6 +12,7 @@ import ResumenDinero from "@/components/ResumenDinero";
 import ResultadosJugada from "@/components/ResultadosJugada";
 import { Combinacion } from "@/components/Bolas";
 import { euros } from "@/lib/euromillones";
+import { actualizarBote, boteGuardado, formatearBote } from "@/lib/bote";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,10 @@ export default async function Inicio({ searchParams }: { searchParams: { error?:
   const { miembroId, isAdmin } = session.user;
   await asegurarSemanas();
   await sincronizarSorteos();
-  const [config, { jugadas, totales }] = await Promise.all([getConfig(), cargarJugadas()]);
+  // Bote del próximo sorteo: se refresca como mucho cada 3 h; si la fuente
+  // falla, la portada se pinta igual (con el último guardado o sin él).
+  await actualizarBote().catch(() => {});
+  const [config, { jugadas, totales }, bote] = await Promise.all([getConfig(), cargarJugadas(), boteGuardado()]);
 
   if (!config.inicioRotacion || jugadas.length === 0) {
     return (
@@ -72,6 +76,18 @@ export default async function Inicio({ searchParams }: { searchParams: { error?:
 
   return (
     <div className="space-y-6">
+      {bote && (
+        <section className="flex items-center gap-4 rounded-2xl border border-oro/30 bg-gradient-to-r from-oro/15 to-oro/5 px-4 py-3">
+          <span className="estrella h-10 w-10 shrink-0 bg-oro" aria-hidden />
+          <div className="min-w-0">
+            <p className="etiqueta">
+              Bote del próximo sorteo · <span className="capitalize">{formatearFecha(bote.sorteo!, { weekday: "long", day: "numeric", month: "short" })}</span>
+            </p>
+            <p className="font-display text-2xl font-extrabold text-oro sm:text-3xl">{formatearBote(bote.cent)}</p>
+          </div>
+        </section>
+      )}
+
       {actual && (
         <section className={`card relative overflow-hidden p-5 sm:p-6 ${meToca && !actual.echada ? "border-oro/60" : ""}`}>
           <span className="estrella absolute -right-6 -top-6 h-32 w-32 bg-oro/10" aria-hidden />

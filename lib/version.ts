@@ -22,6 +22,14 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.3.0",
+    fecha: "2026-11-12",
+    cambios: [
+      "En la portada se ve el bote del próximo sorteo del Euromillones, que se actualiza solo después de cada sorteo.",
+      "La tarea automática diaria (avisos, resultados y bote) se ejecuta ahora siempre a las 11:00 hora de España, también en verano, y más puntual.",
+    ],
+  },
+  {
     version: "1.2.1",
     fecha: "2026-11-11",
     cambios: ["En el móvil, Ajustes tiene su propia pestaña en la barra de abajo (antes estaba dentro de \"Tú\")."],

@@ -197,4 +197,8 @@ model Config {
   historicoDesde     DateTime? @db.Date
   // Para no machacar la API de resultados en cada visita.
   ultimaSync         DateTime?
+  // Bote del próximo sorteo del Euromillones (ver lib/bote.ts).
+  boteCent           BigInt?
+  boteSorteo         DateTime? @db.Date
+  boteActualizado    DateTime?
 }

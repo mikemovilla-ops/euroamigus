@@ -27,9 +27,10 @@ echar el boleto (2 apuestas para martes y viernes, 10 €).
   si aún no se ha subido el boleto, a todos cuando alguien lo sube y a todos
   cuando toca un premio (Euromillones o El Millón). Cada uno puede poner en
   **👤 Ajustes** un email de avisos distinto del de Google, o desactivarlos.
-  Un único cron diario (`/api/cron/diario`) manda los de lunes/martes y
-  descarga resultados. Fuera de producción los avisos solo llegan a los
-  admins.
+  Una tarea diaria de Vercel Schedules (`/api/cron/diario`, a las 11:00 de
+  Madrid) manda los de lunes/martes y descarga resultados; cada ejecución
+  queda en Admin → Ejecución automática. Fuera de producción los avisos solo
+  llegan a los admins.
 
 Solo pueden entrar los emails dados de alta como miembros (y los admins).
 
@@ -56,8 +57,10 @@ cuentas.
 4. **Vercel**: sube el repo a GitHub, impórtalo en Vercel y añade las
    variables de `.env` (con `NEXTAUTH_URL` = la URL de Vercel). En
    *Storage* crea un **Blob** y conéctalo al proyecto (rellena solo
-   `BLOB_READ_WRITE_TOKEN`). Pon un `CRON_SECRET` cualquiera: el cron de
-   `vercel.json` lo usa para pedir los resultados.
+   `BLOB_READ_WRITE_TOKEN`). Pon un `CRON_SECRET` cualquiera: la tarea
+   diaria de `vercel.json` (Vercel Schedules) lo manda para que la app sepa
+   que la llamada es de Vercel. Tras desplegar, compruébala en Vercel →
+   **Schedules** → `diario` → *Run Schedule*.
 5. **Primer uso**: entra con tu cuenta (la de `ADMIN_EMAILS`), ve a
    **Admin**, añade a los 10 con su email de Google en el orden de los
    turnos y elige la semana de inicio (esa semana le toca al primero).

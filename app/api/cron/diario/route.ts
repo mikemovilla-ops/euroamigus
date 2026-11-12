@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sincronizarSorteos, type ResultadoSync } from "@/lib/resultados";
 import { asegurarSemanas } from "@/lib/turnos";
 import { avisarRecordatorio, avisarTurno } from "@/lib/avisos";
+import { actualizarBote } from "@/lib/bote";
 import { aDate, hoyMadrid } from "@/lib/fechas";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +23,15 @@ function describirResultados(r: ResultadoSync): string {
   return `Resultados: ${partes.join(", ")}${r.error ? ` · ${r.error}` : ""}`;
 }
 
-// Lo llama Vercel Cron una vez al día (vercel.json, hacia las 11-12 h de
-// Madrid; el plan gratuito solo permite crons diarios):
+// Lo llama Vercel Schedules (el sustituto de Vercel Cron, ver vercel.json)
+// cada día a las 11:00 hora de Madrid, con hasta 15 min de retraso en el
+// plan gratuito. Llega por GET con "Authorization: Bearer <CRON_SECRET>".
+// Puede llegar alguna vez duplicado: todo lo de aquí es seguro de repetir
+// (los avisos se marcan como enviados y los sorteos no se guardan dos veces).
 // - lunes: aviso "te toca" al responsable de la semana
 // - martes: recordatorio si aún no se ha subido el boleto
-// - todos los días: descarga resultados pendientes (y avisa si hay premio)
+// - todos los días: actualiza el bote del próximo sorteo y descarga
+//   resultados pendientes (y avisa si hay premio)
 // Cada ejecución queda apuntada en EjecucionCron para verla en Admin.
 export async function GET(req: Request) {
   if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -52,6 +57,7 @@ export async function GET(req: Request) {
   });
   if (dia === 1) await paso("aviso «te toca»", avisarTurno);
   if (dia === 2) await paso("recordatorio", avisarRecordatorio);
+  await paso("bote", () => actualizarBote({ forzar: true }));
   await paso("resultados", async () => {
     const r = await sincronizarSorteos({ forzar: true });
     if (r.error && r.pendientes > 0) ok = false;

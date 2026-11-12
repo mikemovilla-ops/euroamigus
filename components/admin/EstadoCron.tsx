@@ -4,8 +4,8 @@
 
 type Ejecucion = { id: string; fecha: Date; ok: boolean; resumen: string };
 
-// El cron es diario pero en el plan gratuito puede ir con hasta una hora de
-// retraso: margen de 26 h antes de dar la alarma.
+// Es diario (11:00 de Madrid, hasta 15 min tarde): margen de 26 h antes de
+// dar la alarma.
 const MARGEN_MS = 26 * 60 * 60 * 1000;
 
 const fechaHora = (d: Date) =>
@@ -29,8 +29,7 @@ export default function EstadoCron({ ejecuciones, ahora = new Date() }: { ejecuc
     <div className="space-y-3">
       {!ultima ? (
         <p className="rounded-xl bg-coral/15 px-4 py-3 text-sm text-coral">
-          Todavía no se ha ejecutado nunca. Se lanza cada día hacia las 11:00 (12:00 en verano); si mañana sigue así, revisa en Vercel →
-          Settings → Cron Jobs.
+          Todavía no se ha ejecutado nunca. Se lanza cada día a las 11:00; si mañana sigue así, revisa en Vercel → Schedules.
         </p>
       ) : (
         <div className={`rounded-xl px-4 py-3 text-sm ${atrasada || !ultima.ok ? "bg-coral/15" : "bg-acierto/10"}`}>
@@ -60,8 +59,8 @@ export default function EstadoCron({ ejecuciones, ahora = new Date() }: { ejecuc
       )}
 
       <p className="text-xs text-tinta/50">
-        Se ejecuta solo cada día hacia las 11:00 (12:00 en verano): los lunes avisa a quien le toca, los martes recuerda si no está subido y
-        todos los días busca resultados. Para lanzarlo a mano: Vercel → Settings → Cron Jobs → Run.
+        Se ejecuta solo cada día a las 11:00 (hora de Madrid, hasta 15 min tarde): los lunes avisa a quien le toca, los martes recuerda si
+        no está subido y todos los días busca resultados. Para lanzarlo a mano: Vercel → Schedules → «diario» → Run Schedule.
       </p>
     </div>
   );
