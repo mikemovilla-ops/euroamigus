@@ -15,9 +15,10 @@ const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "
 
 // (Sin export: un route.ts de Next solo puede exportar GET, POST, dynamic...)
 function describirResultados(r: ResultadoSync): string {
-  if (r.guardados === 0 && r.pendientes === 0 && r.aproximados === 0) return "Resultados: nada pendiente";
+  if (r.guardados === 0 && r.pendientes === 0 && r.aproximados === 0 && r.millon === 0) return "Resultados: nada pendiente";
   const partes = [];
   if (r.guardados) partes.push(`${r.guardados} ${r.guardados === 1 ? "sorteo guardado" : "sorteos guardados"}`);
+  if (r.millon) partes.push(`El Millón: ${r.millon} ${r.millon === 1 ? "código ganador guardado" : "códigos ganadores guardados"}`);
   if (r.pendientes) partes.push(`${r.pendientes} aún sin publicar`);
   if (r.aproximados) partes.push(`${r.aproximados} con importe aproximado (FDJ)`);
   return `Resultados: ${partes.join(", ")}${r.error ? ` · ${r.error}` : ""}`;

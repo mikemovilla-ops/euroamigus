@@ -12,13 +12,16 @@ echar el boleto (2 apuestas para martes y viernes, 10 €).
   **balance** (ganado − jugado) y **quién tiene el dinero**: el premio de
   cada semana lo tiene quien echó el boleto, hasta que el admin apunte que
   se lo ha pasado a otro, lo ha repartido o lo ha usado para jugar.
-- **Resultados automáticos**: se descargan solos de
-  `euromillions.api.pedromealha.dev` (al abrir la app y con un cron los
-  miércoles y sábados). Los premios se muestran en bruto.
+- **Resultados automáticos**: se descargan solos (al abrir la app y en la
+  tarea diaria de las 11:00) de **elgordo.com**, que da los premios exactos
+  de España. Si no responde, de reserva el histórico oficial de la **FDJ**
+  francesa (premios redondeados a 0,10 €, marcados con ≈ y corregidos solos
+  en cuanto responde elgordo.com). Los premios se muestran en bruto.
 - **★ El Millón**: quien registra el boleto mete los códigos de El Millón
-  (martes y viernes). El código ganador no viene en la API: el admin lo
-  mete a mano en Admin → El Millón y la app comprueba si ha tocado. Mientras
-  falte, la semana sale como "pendiente de comprobar".
+  (martes y viernes). El código ganador oficial de España se rellena solo
+  desde elgordo.com (también corrige uno metido a mano que no coincida) y la
+  app comprueba si ha tocado. Mientras falte, la semana sale como
+  "pendiente de comprobar".
 - **⚙️ Admin**: miembros y orden de la rotación, semana de inicio, apuesta
   fija, movimientos del bote (saldo inicial, repartos, pagos con el bote) y
   meter/corregir un sorteo a mano si la API falla.

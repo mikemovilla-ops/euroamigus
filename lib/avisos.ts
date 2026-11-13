@@ -53,7 +53,7 @@ export async function avisarRecordatorio(): Promise<string> {
 }
 
 // Al registrar el boleto por primera vez: aviso a todo el grupo (menos a
-// quien lo ha subido) con la foto y los números.
+// quien lo ha subido, salvo que sea admin) con la foto y los números.
 export async function avisarBoletoSubido(jugadaId: string) {
   const j = await prisma.jugada.findUnique({
     where: { id: jugadaId },
@@ -66,7 +66,9 @@ export async function avisarBoletoSubido(jugadaId: string) {
   const lineas = j.apuestas.map((a) => `${a.fija ? "Fija" : "Variable"}: ${combinacionTexto(a.numeros, a.estrellas)}`);
   const millon = [...j.millonMartes, ...j.millonViernes];
   await enviar(
-    await destinatarios({ excepto: j.echadaPorId }),
+    // A todos menos a quien lo ha subido; los admins siempre reciben copia,
+    // aunque lo hayan subido ellos (como confirmación).
+    await destinatarios({ excepto: j.echadaPorId, conAdmins: true }),
     `✅ Boleto echado: ${semana}`,
     `${quien} ha echado el boleto de esta semana${enLugarDe}.\n${lineas.join("\n")}${millon.length ? `\nEl Millón: ${millon.join(", ")}` : ""}${j.fotoUrl ? `\nFoto: ${j.fotoUrl}` : ""}`,
     `<p><b>${escapeHtml(quien)}</b> ha echado el boleto de esta semana${escapeHtml(enLugarDe)}.</p><ul>${lineas.map((l) => `<li>${l}</li>`).join("")}</ul>${millon.length ? `<p>El Millón: <code>${millon.join(", ")}</code></p>` : ""}${j.fotoUrl ? `<p><img src="${j.fotoUrl}" alt="Boleto" style="max-width:320px;border-radius:12px"></p>` : ""}`

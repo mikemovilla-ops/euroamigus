@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 
 type Fila = { fecha: string; fechaTexto: string; nuestros: string[]; ganadores: string[] | null };
 
-// Código ganador de El Millón de cada sorteo jugado (no viene en la API).
-// Primero salen los pendientes; al guardar, la app comprueba sola si alguno
-// de nuestros códigos coincide.
+// Código ganador de El Millón de cada sorteo jugado. Se rellena solo con el
+// oficial de España (elgordo.com, ver lib/resultados.ts); aquí se ve y, si
+// hiciera falta, se puede meter a mano mientras no esté publicado.
 export default function AdminMillon({ filas }: { filas: Fila[] }) {
   if (filas.length === 0) return <p className="text-sm text-tinta/60">Todavía no hay sorteos jugados que comprobar.</p>;
   return (
     <div className="space-y-2">
       <p className="mb-3 text-sm text-tinta/60">
-        Mira el código ganador en loteriasyapuestas.es y pégalo aquí. Si un sorteo tiene varios (Millón extra), sepáralos con comas.
+        El código ganador se rellena solo, con el oficial de España, al descargar los resultados (y se corrige solo si no coincide). Solo
+        tendrías que meterlo a mano si tarda en publicarse. Si un sorteo tiene varios (Millón extra), sepáralos con comas.
       </p>
       {filas.map((f) => (
         <FilaMillon key={f.fecha} fila={f} />

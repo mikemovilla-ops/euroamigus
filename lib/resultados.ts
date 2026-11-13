@@ -1,61 +1,47 @@
 import { prisma } from "@/lib/prisma";
 import { aDate, aIso, sorteoCelebrado, sorteosDeSemana } from "@/lib/fechas";
-import type { PremioCategoria } from "@/lib/euromillones";
-import { avisarPremioSorteo } from "@/lib/avisos";
+import { avisarPremioMillon, avisarPremioSorteo } from "@/lib/avisos";
 import { parsearCsvFdj, URL_FDJ, type SorteoFuente } from "@/lib/fdj";
+import { parsearElGordo, urlElGordo, type SorteoElGordo } from "@/lib/elgordo";
 import { primerArchivoDelZip } from "@/lib/zip";
 
-// Dos fuentes de resultados (la web oficial de Loterías bloquea las
-// peticiones desde servidores):
-// 1. API pública pedromealha: importes EXACTOS (fuente "api"). Es gratuita y
-//    a veces corta con 429 "demasiadas peticiones" durante horas.
-// 2. Histórico oficial de la FDJ francesa: siempre disponible, pero redondea
-//    los premios hacia abajo a 0,10 € (fuente "fdj" = importe aproximado).
-// Si solo se ha podido sacar de la FDJ, en cada sincronización se vuelve a
-// intentar la API para cambiar los importes por los exactos (sin repetir el
-// aviso de premio). Los metidos a mano por el admin ("manual") no se tocan.
-const API = "https://euromillions.api.pedromealha.dev/v1/draws";
+// Fuentes de resultados (la web oficial de Loterías bloquea las peticiones
+// desde servidores):
+// 1. elgordo.com (fuente "elgordo"): premios EXACTOS de España y código
+//    ganador de El Millón en España (que se guarda siempre, aunque el admin
+//    hubiera metido otro a mano). Una página por sorteo.
+// 2. Histórico oficial de la FDJ francesa (fuente "fdj"): siempre
+//    disponible, pero redondea los premios hacia abajo a 0,10 €, así que es
+//    solo de reserva y se marca como aproximado.
+// Si un sorteo solo se ha podido sacar de la FDJ (o viene de la API
+// portuguesa que se usaba antes, "api", que difería en algún céntimo), en
+// cada sincronización se vuelve a intentar elgordo.com para dejar los
+// importes exactos (sin repetir el aviso de premio). Los metidos a mano por
+// el admin ("manual") no se tocan nunca.
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+const POR_MEJORAR = ["fdj", "api"];
 
 // Para no machacar las fuentes en cada visita: como mucho una vez cada
 // 15 min (salvo que se fuerce desde el botón de admin o el cron).
 const ESPERA_MS = 15 * 60 * 1000;
 
-type SorteoApi = {
-  date: string;
-  numbers: string[];
-  stars: string[];
-  prizes: { matched_numbers: number; matched_stars: number; prize: number; winners: number }[];
-};
-
-export function convertirSorteoApi(s: SorteoApi): SorteoFuente {
-  return {
-    fecha: s.date,
-    numeros: s.numbers.map(Number).sort((a, b) => a - b),
-    estrellas: s.stars.map(Number).sort((a, b) => a - b),
-    premios: s.prizes.map<PremioCategoria>((p) => ({
-      n: p.matched_numbers,
-      e: p.matched_stars,
-      premioCent: Math.round(p.prize * 100),
-      ganadores: p.winners,
-    })),
-  };
-}
-
 const completo = (s: SorteoFuente) => s.numeros.length === 5 && s.estrellas.length === 2 && s.premios.length > 0;
 
-async function deLaApi(fechas: string[]): Promise<Map<string, SorteoFuente>> {
-  const out = new Map<string, SorteoFuente>();
-  for (const año of Array.from(new Set(fechas.map((f) => f.slice(0, 4))))) {
-    const res = await fetch(`${API}?year=${año}`, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
-    if (!res.ok) throw new Error(`API principal: respondió ${res.status}`);
-    for (const s of (await res.json()) as SorteoApi[]) {
-      if (fechas.includes(s.date)) {
-        const c = convertirSorteoApi(s);
-        if (completo(c)) out.set(c.fecha, c);
-      }
+async function deElGordo(fechas: string[]): Promise<{ sorteos: Map<string, SorteoElGordo>; errores: string[] }> {
+  const sorteos = new Map<string, SorteoElGordo>();
+  const errores: string[] = [];
+  for (const fecha of fechas) {
+    try {
+      const res = await fetch(urlElGordo(fecha), { cache: "no-store", headers: { "user-agent": UA }, signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) throw new Error(`respondió ${res.status}`);
+      const s = parsearElGordo(await res.text(), fecha);
+      // null = todavía no está publicado (la web enseña otro sorteo).
+      if (s && completo(s)) sorteos.set(fecha, s);
+    } catch (e) {
+      errores.push(`elgordo.com ${fecha}: ${(e as Error).message}`);
     }
   }
-  return out;
+  return { sorteos, errores };
 }
 
 async function deLaFdj(fechas: string[]): Promise<Map<string, SorteoFuente>> {
@@ -69,60 +55,58 @@ async function deLaFdj(fechas: string[]): Promise<Map<string, SorteoFuente>> {
   );
 }
 
-// Sorteos ya celebrados de semanas echadas: los que faltan y los que solo
-// tenemos con importe aproximado de la FDJ.
-async function fechasPorActualizar(): Promise<{ faltan: string[]; aproximados: string[] }> {
+// Sorteos ya celebrados de semanas echadas: los que faltan, los que tenemos
+// con importes aproximados y los que no tienen aún código de El Millón.
+async function fechasPorActualizar() {
   const jugadas = await prisma.jugada.findMany({ where: { echada: true }, select: { semana: true } });
   const fechas = jugadas.flatMap((j) => sorteosDeSemana(aIso(j.semana))).filter((f) => sorteoCelebrado(f));
-  if (fechas.length === 0) return { faltan: [], aproximados: [] };
-  const guardados = await prisma.sorteo.findMany({
-    where: { fecha: { in: fechas.map(aDate) } },
-    select: { fecha: true, fuente: true },
-  });
+  if (fechas.length === 0) return { faltan: [], aMejorar: [], sinMillon: [] };
+  const [guardados, millones] = await Promise.all([
+    prisma.sorteo.findMany({ where: { fecha: { in: fechas.map(aDate) } }, select: { fecha: true, fuente: true } }),
+    prisma.millon.findMany({ where: { fecha: { in: fechas.map(aDate) } }, select: { fecha: true } }),
+  ]);
   const fuente = new Map(guardados.map((s) => [aIso(s.fecha), s.fuente]));
+  const conMillon = new Set(millones.map((m) => aIso(m.fecha)));
   return {
     faltan: fechas.filter((f) => !fuente.has(f)),
-    aproximados: fechas.filter((f) => fuente.get(f) === "fdj"),
+    aMejorar: fechas.filter((f) => POR_MEJORAR.includes(fuente.get(f) ?? "")),
+    sinMillon: fechas.filter((f) => !conMillon.has(f)),
   };
 }
 
-export type ResultadoSync = { pendientes: number; guardados: number; aproximados: number; error?: string };
+export type ResultadoSync = { pendientes: number; guardados: number; aproximados: number; millon: number; error?: string };
 
 export async function sincronizarSorteos({ forzar = false } = {}): Promise<ResultadoSync> {
-  const { faltan, aproximados } = await fechasPorActualizar();
-  if (faltan.length === 0 && aproximados.length === 0) return { pendientes: 0, guardados: 0, aproximados: 0 };
+  const { faltan, aMejorar, sinMillon } = await fechasPorActualizar();
+  const consultar = Array.from(new Set([...faltan, ...aMejorar, ...sinMillon])).sort();
+  if (consultar.length === 0) return { pendientes: 0, guardados: 0, aproximados: 0, millon: 0 };
 
   const config = await prisma.config.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
   if (!forzar && config.ultimaSync && Date.now() - config.ultimaSync.getTime() < ESPERA_MS) {
-    return { pendientes: faltan.length, guardados: 0, aproximados: aproximados.length };
+    return { pendientes: faltan.length, guardados: 0, aproximados: aMejorar.length, millon: 0 };
   }
   await prisma.config.update({ where: { id: 1 }, data: { ultimaSync: new Date() } });
 
-  const errores: string[] = [];
-  let exactos = new Map<string, SorteoFuente>();
-  try {
-    exactos = await deLaApi([...faltan, ...aproximados]);
-  } catch (e) {
-    errores.push((e as Error).message);
-  }
+  const { sorteos: exactos, errores } = await deElGordo(consultar);
 
-  // Los que la API no ha dado y aún no tenemos: de la FDJ.
-  const sinApi = faltan.filter((f) => !exactos.has(f));
+  // Los que elgordo.com no ha dado y aún no tenemos: de la FDJ.
+  const sinExacto = faltan.filter((f) => !exactos.has(f));
   let deReserva = new Map<string, SorteoFuente>();
-  if (sinApi.length > 0) {
+  if (sinExacto.length > 0) {
     try {
-      deReserva = await deLaFdj(sinApi);
+      deReserva = await deLaFdj(sinExacto);
     } catch (e) {
       errores.push((e as Error).message);
     }
   }
 
+  // 1. Sorteos nuevos (con aviso de premio).
   let guardados = 0;
   let guardadosFdj = 0;
   for (const fecha of faltan) {
     const s = exactos.get(fecha) ?? deReserva.get(fecha);
     if (!s) continue;
-    const fuente = exactos.has(fecha) ? "api" : "fdj";
+    const fuente = exactos.has(fecha) ? "elgordo" : "fdj";
     // create (no upsert): si dos visitas sincronizan a la vez, solo una lo
     // guarda, y así el aviso de premio no sale dos veces.
     try {
@@ -137,23 +121,43 @@ export async function sincronizarSorteos({ forzar = false } = {}): Promise<Resul
     await avisarPremioSorteo(fecha);
   }
 
-  // Importes aproximados de la FDJ → exactos, sin volver a avisar.
+  // 2. Importes aproximados → exactos, sin volver a avisar.
   let corregidos = 0;
-  for (const fecha of aproximados) {
+  for (const fecha of aMejorar) {
     const s = exactos.get(fecha);
     if (!s) continue;
-    await prisma.sorteo.updateMany({
-      where: { fecha: aDate(fecha), fuente: "fdj" },
-      data: { numeros: s.numeros, estrellas: s.estrellas, premios: s.premios, fuente: "api" },
+    const r = await prisma.sorteo.updateMany({
+      where: { fecha: aDate(fecha), fuente: { in: POR_MEJORAR } },
+      data: { numeros: s.numeros, estrellas: s.estrellas, premios: s.premios, fuente: "elgordo" },
     });
-    corregidos++;
+    corregidos += r.count;
+  }
+
+  // 3. Código ganador de El Millón: siempre el oficial de España que da
+  //    elgordo.com, también si el admin lo había metido a mano y no coincide.
+  //    Se revisa en cada sorteo que se consulta (nuevo, por mejorar o sin
+  //    Millón); el aviso solo sale si un código nuestro pasa a ser ganador.
+  let millon = 0;
+  for (const [fecha, s] of exactos) {
+    if (s.millon.length === 0) continue;
+    const antes = await prisma.millon.findUnique({ where: { fecha: aDate(fecha) } });
+    const iguales = antes && antes.codigos.length === s.millon.length && s.millon.every((c) => antes.codigos.includes(c));
+    if (iguales) continue;
+    await prisma.millon.upsert({
+      where: { fecha: aDate(fecha) },
+      update: { codigos: s.millon },
+      create: { fecha: aDate(fecha), codigos: s.millon },
+    });
+    millon++;
+    await avisarPremioMillon(fecha, antes?.codigos ?? []);
   }
 
   const pendientes = faltan.length - guardados;
   return {
     pendientes,
     guardados,
-    aproximados: aproximados.length - corregidos + guardadosFdj,
+    aproximados: aMejorar.length - corregidos + guardadosFdj,
+    millon,
     // Solo es un error de verdad si ha quedado algo sin resultado.
     ...(pendientes > 0 && errores.length ? { error: errores.join(" · ") } : {}),
   };

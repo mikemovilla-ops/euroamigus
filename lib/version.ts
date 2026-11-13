@@ -22,6 +22,15 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.4.0",
+    fecha: "2026-11-13",
+    cambios: [
+      "Resultados con los premios exactos de España (de elgordo.com), al céntimo. La fuente anterior fallaba a menudo y además daba los importes de otro país, que a veces se diferencian en un céntimo.",
+      "El código ganador de El Millón se rellena solo con el oficial de España: ya no hay que meterlo a mano.",
+      "El admin recibe también el email de \"Boleto subido\" cuando es él quien lo sube, como confirmación.",
+    ],
+  },
+  {
     version: "1.3.0",
     fecha: "2026-11-12",
     cambios: [
