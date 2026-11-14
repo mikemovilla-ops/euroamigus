@@ -22,6 +22,13 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.4.1",
+    fecha: "2026-11-14",
+    cambios: [
+      "Icono propio de EuroAmigus: al guardar la web en la pantalla de inicio del móvil sale el logo, y se abre a pantalla completa como una app más.",
+    ],
+  },
+  {
     version: "1.4.0",
     fecha: "2026-11-13",
     cambios: [

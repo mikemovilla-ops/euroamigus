@@ -12,6 +12,10 @@ const body = Inter({ subsets: ["latin"], variable: "--font-body" });
 export const metadata: Metadata = {
   title: "EuroAmigus",
   description: "Turnos, boletos e histórico del Euromillones del grupo",
+  // Al guardarla en la pantalla de inicio del iPhone: se abre a pantalla
+  // completa (sin barra de Safari) y con este nombre bajo el icono
+  // (app/apple-icon.png).
+  appleWebApp: { capable: true, title: "EuroAmigus", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = { themeColor: "#0B1437" };
