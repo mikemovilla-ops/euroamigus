@@ -22,6 +22,11 @@ export type EntradaVersion = {
 
 export const HISTORIAL_VERSIONES: EntradaVersion[] = [
   {
+    version: "1.4.2",
+    fecha: "2026-11-19",
+    cambios: ["El bote del próximo sorteo es ahora el que se anuncia en España (antes salía la estimación de Irlanda, que a veces es distinta)."],
+  },
+  {
     version: "1.4.1",
     fecha: "2026-11-14",
     cambios: [

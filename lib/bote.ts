@@ -1,15 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { aDate, aIso, hoyMadrid, horaMadrid, sumarDias } from "@/lib/fechas";
+import { aTexto, primeraFechaSorteo } from "@/lib/elgordo";
 
-// Bote del próximo sorteo del Euromillones (el mismo en toda Europa).
+// Bote del próximo sorteo del Euromillones. OJO: aunque el bote es común,
+// cada país anuncia su propia ESTIMACIÓN (p. ej. para el 20/11/2026 España y
+// Francia decían 37 M€ e Irlanda 40 M€), así que se usa la de España.
 // Fuentes, por orden:
-// 1. Web oficial de la lotería irlandesa (en euros): la página es Next.js y
-//    trae el dato estructurado en __NEXT_DATA__ →
-//    props.pageProps.dbgConfig.jackpotInfo = [{ nextDrawDate, amount (céntimos), guaranteed }]
-// 2. FDJ francesa: la descripción de la página dice "Jackpot EuroMillions de 17 M€".
+// 1. elgordo.com (España): la página del último resultado dice
+//    "Próximo bote 37.000.000,00 €"; el sorteo es el siguiente martes o
+//    viernes después de ese resultado.
+// 2. FDJ francesa (coincide con España): "Jackpot EuroMillions de 37 M€".
+// 3. Lotería irlandesa, solo si fallan las otras (su estimación puede ser
+//    distinta): __NEXT_DATA__ → props.pageProps.dbgConfig.jackpotInfo.
 // Se guarda en Config y se refresca en la tarea diaria y, como mucho cada
 // 3 h, al abrir la portada.
 
+export const URL_ELGORDO_ULTIMO = "https://www.elgordo.com/es/resultados/euromillones";
 export const URL_IRLANDA = "https://www.lottery.ie/draw-games/euromillions";
 export const URL_FDJ_EUROMILLIONS = "https://www.fdj.fr/jeux-de-tirage/euromillions-my-million";
 const ESPERA_MS = 3 * 60 * 60 * 1000;
@@ -33,6 +39,25 @@ export function proximoSorteo(ahora: Date = new Date()): string {
     if ((dia === 2 || dia === 5) && (i > 0 || horaMadrid(ahora) < 21)) return f;
   }
   return hoy;
+}
+
+// Siguiente sorteo (martes o viernes) estrictamente después de `fecha`.
+export function sorteoSiguienteA(fecha: string): string {
+  for (let i = 1; i <= 7; i++) {
+    const f = sumarDias(fecha, i);
+    const dia = aDate(f).getUTCDay();
+    if (dia === 2 || dia === 5) return f;
+  }
+  return sumarDias(fecha, 3);
+}
+
+export function parsearBoteElGordo(html: string): Bote | null {
+  const texto = aTexto(html);
+  const ultimo = primeraFechaSorteo(texto);
+  const m = texto.match(/Próximo bote\s*([\d.]+,\d{2})\s*€/);
+  if (!ultimo || !m) return null;
+  const cent = Math.round(Number(m[1].replace(/\./g, "").replace(",", ".")) * 100);
+  return razonable(cent) ? { cent, sorteo: sorteoSiguienteA(ultimo) } : null;
 }
 
 const enMadrid = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(iso));
@@ -73,17 +98,27 @@ async function descargar(url: string): Promise<string> {
 
 export async function obtenerBote(): Promise<Bote & { fuente: string }> {
   const errores: string[] = [];
+  const proximo = proximoSorteo();
   try {
-    const b = parsearBoteIrlanda(await descargar(URL_IRLANDA));
-    if (b) return { ...b, fuente: "Irlanda" };
-    errores.push("Irlanda: no se encuentra el bote en la página");
+    const b = parsearBoteElGordo(await descargar(URL_ELGORDO_ULTIMO));
+    // Si la web aún no ha publicado el último sorteo, su "próximo bote" es
+    // el de un sorteo ya pasado: no vale.
+    if (b && b.sorteo! >= proximo) return { ...b, fuente: "elgordo.com" };
+    errores.push(b ? "elgordo.com: aún no ha publicado el último sorteo" : "elgordo.com: no se encuentra el bote en la página");
   } catch (e) {
     errores.push((e as Error).message);
   }
   try {
     const b = parsearBoteFdj(await descargar(URL_FDJ_EUROMILLIONS));
-    if (b) return { ...b, sorteo: proximoSorteo(), fuente: "FDJ" };
+    if (b) return { ...b, sorteo: proximo, fuente: "FDJ" };
     errores.push("FDJ: no se encuentra el bote en la página");
+  } catch (e) {
+    errores.push((e as Error).message);
+  }
+  try {
+    const b = parsearBoteIrlanda(await descargar(URL_IRLANDA));
+    if (b) return { ...b, fuente: "Irlanda (estimación irlandesa)" };
+    errores.push("Irlanda: no se encuentra el bote en la página");
   } catch (e) {
     errores.push((e as Error).message);
   }

@@ -22,13 +22,21 @@ const aCent = (txt: string) => Math.round(Number(txt.replace(/\./g, "").replace(
 const aEntero = (txt: string) => Number(txt.replace(/\./g, ""));
 
 // Texto plano de la página: sin etiquetas, comentarios ni espacios repetidos.
-function aTexto(html: string): string {
+export function aTexto(html: string): string {
   return html
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<[^>]*>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/\s+/g, " ");
+}
+
+// Primera fecha de sorteo que aparece en el texto ("martes, 17 noviembre
+// 2026") como YYYY-MM-DD, o null.
+export function primeraFechaSorteo(texto: string): string | null {
+  const m = texto.match(new RegExp(`(?:${DIAS.join("|")}), (\\d{1,2}) (${MESES.join("|")}) (\\d{4})`));
+  if (!m) return null;
+  return `${m[3]}-${String(MESES.indexOf(m[2]) + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 }
 
 // Devuelve el sorteo de `fecha` o null si la página no es de esa fecha (si

@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { formatearBote, parsearBoteFdj, parsearBoteIrlanda, proximoSorteo } from "./bote";
+import { formatearBote, parsearBoteElGordo, parsearBoteFdj, parsearBoteIrlanda, proximoSorteo, sorteoSiguienteA } from "./bote";
+
+// Recorte del HTML real de elgordo.com (último resultado: martes 17/11/2026).
+const htmlElGordo = `<h2>martes, 17 noviembre 2026</h2><ul><li>3</li></ul><p>El Millón en España: <!-- --> ABC 12345</p>
+<p>Recaudación 50.000.000,00 €</p><p>Bote <!-- -->26.000.000,00 €</p><p>Próximo bote <!-- -->37.000.000,00 €</p>
+<div>EuroMillones viernes, 20 noviembre € 37 Millones</div>`;
 
 // Recorte con la estructura real de lottery.ie (__NEXT_DATA__ de Next.js).
 const htmlIrlanda = (jackpotInfo: unknown) =>
@@ -11,6 +16,16 @@ const htmlIrlanda = (jackpotInfo: unknown) =>
   })}</script></body></html>`;
 
 describe("bote del próximo sorteo", () => {
+  it("lee el bote de España de elgordo.com (el sorteo es el siguiente al último resultado)", () => {
+    expect(parsearBoteElGordo(htmlElGordo)).toEqual({ cent: 3_700_000_000, sorteo: "2026-11-20" });
+    expect(parsearBoteElGordo("<p>sin datos</p>")).toBeNull();
+  });
+
+  it("calcula el sorteo siguiente a uno dado", () => {
+    expect(sorteoSiguienteA("2026-11-17")).toBe("2026-11-20"); // martes → viernes
+    expect(sorteoSiguienteA("2026-11-20")).toBe("2026-11-24"); // viernes → martes
+  });
+
   it("lee el bote de la web irlandesa (céntimos) y pasa la fecha a hora de Madrid", () => {
     const b = parsearBoteIrlanda(
       htmlIrlanda([
